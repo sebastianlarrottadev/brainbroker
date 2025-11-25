@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Deceptive - Retro Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="/socket.io/socket.io.js"></script>
+  
+  <style>
+    .notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(239, 68, 68, 0.9);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 10px;
+      z-index: 1000;
+      animation: slideDown 0.3s ease;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 10px;
+    }
+
+    .notification.success {
+      background: rgba(34, 197, 94, 0.9);
+    }
+
+    @keyframes slideDown {
+      from { transform: translate(-50%, -100%); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+
+    .loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .loading::after {
+      content: '...';
+      animation: loadingDots 1.5s infinite;
+    }
+
+    @keyframes loadingDots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg-animation" id="bgAnimation"></div>
+
+  <div class="screen start-screen" id="startScreen">
+    <h1 class="title">deceptive</h1>
+
+    <div class="input-container">
+      <input type="text" class="name-input" id="playerName" placeholder="Usuario" maxlength="20">
+    </div>
+    <div class="input-container">
+      <input type="text" class="sala-input" id="salaId" placeholder="Nombre de la sala">
+    </div>
+
+    <!-- 🎮 Carrusel de selección de personaje -->
+    <div class="carousel-container">
+      <h2 class="character-title">Selecciona tu personaje</h2>
+      <div class="carousel">
+        <span class="arrow" id="arrowLeft">⬅</span>
+        <img id="characterImage" src="ps1.png" alt="personaje">
+        <span class="arrow" id="arrowRight">➡</span>
+      </div>
+    </div>
+
+    <div class="btn-container">
+      <button id="crearSalaBtn" >Crear Sala</button>
+      <button id="unirseSalaBtn">Unirse a Sala</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+
+    let jugadorId = null;
+    let personajeIndex = 0;
+    const personajes = ["ps1.png", "ps2.png", "ps3.png", "ps4.png"];
+
+    const personajeImg = document.getElementById("characterImage");
+    const leftArrow = document.getElementById("arrowLeft");
+    const rightArrow = document.getElementById("arrowRight");
+    const crearBtn = document.getElementById("crearSalaBtn");
+    const unirseBtn = document.getElementById("unirseSalaBtn");
+
+    // 🎮 Carrusel funcional
+    leftArrow.addEventListener("click", () => {
+      personajeIndex = (personajeIndex - 1 + personajes.length) % personajes.length;
+      personajeImg.src = personajes[personajeIndex];
+      localStorage.setItem("personaje", personajes[personajeIndex]);
+    });
+
+    rightArrow.addEventListener("click", () => {
+      personajeIndex = (personajeIndex + 1) % personajes.length;
+      personajeImg.src = personajes[personajeIndex];
+      localStorage.setItem("personaje", personajes[personajeIndex]);
+    });
+
+    // Guardar personaje inicial por defecto
+    localStorage.setItem("personaje", personajes[personajeIndex]);
+
+    socket.on("jugadorId", (id) => {
+      jugadorId = id;
+      localStorage.setItem("jugadorId", jugadorId);
+    });
+
+    // Función para mostrar notificación
+    function showNotification(message, isError = true) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${isError ? '' : 'success'}`;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.remove();
+      }, 4000);
+    }
+
+    // Función para mostrar loading
+    function setLoading(isLoading) {
+      if (isLoading) {
+        crearBtn.classList.add('loading');
+        unirseBtn.classList.add('loading');
+        crearBtn.textContent = 'CONECTANDO';
+        unirseBtn.textContent = 'CONECTANDO';
+      } else {
+        crearBtn.classList.remove('loading');
+        unirseBtn.classList.remove('loading');
+        crearBtn.textContent = 'Crear Sala';
+        unirseBtn.textContent = 'Unirse a Sala';
+      }
+    }
+
+    // Validar formulario
+    function validateForm() {
+      const nombre = document.getElementById("playerName").value.trim();
+      const salaId = document.getElementById("salaId").value.trim();
+
+      if (!nombre) {
+        showNotification('INGRESA TU NOMBRE');
+        return false;
+      }
+      
+      if (!salaId) {
+        showNotification('INGRESA ID DE SALA');
+        return false;
+      }
+      
+      if (nombre.length < 2) {
+        showNotification('NOMBRE MUY CORTO');
+        return false;
+      }
+
+      return { nombre, salaId };
+    }
+
+    // 🧩 Crear sala - USANDO REGISTRAR JUGADOR
+    crearBtn.addEventListener("click", () => {
+      const formData = validateForm();
+      if (!formData) return;
+
+      const { nombre, salaId } = formData;
+      const personaje = localStorage.getItem("personaje");
+
+      setLoading(true);
+
+      // Guardar datos en localStorage
+      localStorage.setItem("playerName", nombre);
+      localStorage.setItem("salaId", salaId);
+      localStorage.setItem("vida", "100");
+
+      // Emitir evento al servidor - USANDO registrarJugador
+      socket.emit("registrarJugador", { 
+        salaId, 
+        playerName: nombre, 
+        personaje,
+        desdeLobby: true 
+      });
+    });
+
+    // 🧩 Unirse a sala - USANDO REGISTRAR JUGADOR
+    unirseBtn.addEventListener("click", () => {
+      const formData = validateForm();
+      if (!formData) return;
+
+      const { nombre, salaId } = formData;
+      const personaje = localStorage.getItem("personaje");
+
+      setLoading(true);
+
+      // Guardar datos en localStorage
+      localStorage.setItem("playerName", nombre);
+      localStorage.setItem("salaId", salaId);
+      localStorage.setItem("vida", "100");
+
+      // Emitir evento al servidor - USANDO registrarJugador
+      socket.emit("registrarJugador", { 
+        salaId, 
+        playerName: nombre, 
+        personaje,
+        desdeLobby: true 
+      });
+    });
+
+    // ✅ Redirección al lobby cuando el registro es exitoso
+    socket.on("registroExitoso", (data) => {
+      console.log("✅ Registro exitoso:", data);
+      
+      const mensaje = data.esSalaNueva 
+        ? `SALA ${data.salaId} CREADA!` 
+        : `UNIDO A SALA ${data.salaId}!`;
+      
+      showNotification(mensaje, false);
+      
+      setTimeout(() => {
+        window.location.href = "lobby.html";
+      }, 1000);
+    });
+
+    // ❌ Manejar errores del servidor
+    socket.on("error", (msg) => {
+      setLoading(false);
+      showNotification(msg);
+    });
+
+    // 🔌 Manejar desconexión
+    socket.on("disconnect", () => {
+      setLoading(false);
+      showNotification("CONEXIÓN PERDIDA");
+    });
+
+    // 📝 Cargar datos guardados si existen
+    window.addEventListener('load', function() {
+      const savedName = localStorage.getItem("playerName");
+      const savedSala = localStorage.getItem("salaId");
+      const savedChar = localStorage.getItem("personaje");
+      
+      if (savedName) document.getElementById('playerName').value = savedName;
+      if (savedSala) document.getElementById('salaId').value = savedSala;
+      if (savedChar) {
+        // Encontrar el índice del personaje guardado
+        personajeIndex = personajes.indexOf(savedChar);
+        if (personajeIndex === -1) personajeIndex = 0;
+        personajeImg.src = personajes[personajeIndex];
+      }
+    });
+
+    // 🎯 Permitir enviar con Enter en cualquier campo
+    document.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        unirseBtn.click();
+      }
+    });
+  </script>
+
+  <script src="Prueba_aplicaciones2-main/audio.js">
+    iniciarMusicaFondo("Prueba_aplicaciones2-main/sonidos/game-minecraft-gaming-background-music-402451.mp3");
+  </script>
+</body>
+</html>

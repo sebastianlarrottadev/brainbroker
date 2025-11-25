@@ -1,0 +1,24 @@
+{
+  "name": "prueba_server",
+  "version": "1.0.0",
+  "description": "Servidor de prueba con Node.js",
+  "keywords": [
+    "node",
+    "express",
+    "socket.io",
+    "server"
+  ],
+  "license": "ISC",
+  "author": "Sebastián Larrotta",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"No test specified\"",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1",
+    "uuid": "^13.0.0"
+  }
+}

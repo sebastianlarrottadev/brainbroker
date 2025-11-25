@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opciones de Tarjeta</title>
+  <script src="/socket.io/socket.io.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0a0e27 100%);
+      color: #00ffcc;
+      font-family: 'Orbitron', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 25px;
+      padding: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      color: #00ffcc;
+      text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc, 0 0 40px #00ffcc;
+      animation: glow 2s ease-in-out infinite alternate;
+      position: relative;
+      z-index: 1;
+    }
+
+    @keyframes glow {
+      from { text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc, 0 0 40px #00ffcc; }
+      to { text-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc, 0 0 80px rgba(0, 255, 204, 0.8); }
+    }
+
+    .options-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    button {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(10px);
+      color: #e6eef6;
+      border: 2px solid;
+      border-radius: 15px;
+      padding: 20px 30px;
+      font-size: 16px;
+      font-family: 'Orbitron', monospace;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    button:hover {
+      transform: translateY(-5px) scale(1.02);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    button:disabled:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .danger { border-color: #ff1100; color: #ff7070; }
+    .info { border-color: #00d9ff; color: #00d9ff; }
+    .success { border-color: #00ffcc; color: #00ffcc; }
+
+    .feedback {
+      font-size: 18px;
+      text-align: center;
+      margin-top: 20px;
+      min-height: 40px;
+      text-shadow: 0 0 10px currentColor;
+      animation: fade 0.3s ease-in-out;
+      padding: 15px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    @keyframes fade {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      color: #00ffcc;
+      text-decoration: none;
+      font-weight: 700;
+      letter-spacing: 2px;
+      border: 2px solid #00ffcc;
+      padding: 12px 24px;
+      border-radius: 10px;
+      transition: 0.3s;
+      background: rgba(0, 255, 204, 0.1);
+      text-align: center;
+    }
+
+    .btn:hover {
+      background: #00ffcc;
+      color: #0a0e27;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 255, 204, 0.3);
+    }
+
+    .btn-secondary {
+      border-color: #00d9ff;
+      color: #00d9ff;
+      background: rgba(0, 217, 255, 0.1);
+    }
+
+    .btn-secondary:hover {
+      background: #00d9ff;
+      color: #0a0e27;
+      box-shadow: 0 5px 15px rgba(0, 217, 255, 0.3);
+    }
+
+    .health-display {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 255, 136, 0.1);
+      border: 2px solid #00ff88;
+      border-radius: 10px;
+      padding: 10px 15px;
+      font-size: 0.9rem;
+      color: #00ff88;
+      text-shadow: 0 0 10px #00ff88;
+    }
+
+    .notification {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 255, 136, 0.9);
+      color: #0a0e27;
+      padding: 20px 40px;
+      border-radius: 15px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      z-index: 1000;
+      animation: fadeInOut 2s ease-in-out;
+    }
+
+    @keyframes fadeInOut {
+      0%, 100% { opacity: 0; transform: translate(-50%, -20px); }
+      20%, 80% { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+  </style>
+</head>
+<body>
+
+  <h1>Opciones de Tarjeta</h1>
+
+  <div class="health-display" id="healthDisplay">
+    Salud: <span id="currentHealth">100</span>%
+  </div>
+
+  <div class="options-container">
+    <button class="danger" onclick="cambiarVida(-5, 'Perdiste 5 puntos de salud mental 😵‍💫')">
+      1. Cambiar tarjeta por una mejor<br>
+      <small>Si la cambias, se te disminuye 5 puntos de salud mental.</small>
+    </button>
+
+    <button class="info" onclick="cambiarVida(-3, 'Perdiste 3 puntos de salud mental 🧠')">
+      2. Aumenta la probabilidad en un 30% que te toque algo mejor<br>
+      <small>Si la cambias, se te disminuye 3 puntos de salud mental.</small>
+    </button>
+
+    <button class="success" onclick="cambiarVida(+2, '¡Excelente elección! Ganas +2 de salud mental 💪')">
+      3. Quedarme con esta tarjeta<br>
+      <small>Te felicita, no afecta tu salud mental y te agrega 2 puntos.</small>
+    </button>
+  </div>
+
+  <div id="mensaje" class="feedback"></div>
+
+  <div class="action-buttons">
+    <a href="../public/lobby.html" class="btn">Volver al Lobby</a>
+    <a href="../public/index.html" class="btn btn-secondary">Menú Principal</a>
+  </div>
+
+<script>
+    const socket = io();
+    
+    // Cargar datos del jugador
+    const playerName = localStorage.getItem("playerName") || "PLAYER";
+    const salaId = localStorage.getItem("salaId") || "default";
+    const personaje = localStorage.getItem("personaje") || "ps1.png";
+    let vidaActual = parseInt(localStorage.getItem("vida")) || 100;
+    
+    document.getElementById('currentHealth').textContent = vidaActual;
+
+    // 🔄 REGISTRAR JUGADOR EN CHANCE.HTML
+    socket.emit("registrarJugador", { 
+      salaId, 
+      playerName, 
+      personaje,
+      desdeLobby: false 
+    });
+
+    console.log("🎮 Chance.html cargado. Jugador:", playerName, "Sala:", salaId);
+
+    function cambiarVida(valor, mensaje) {
+        console.log(`🎯 Cambiando vida: ${valor}`);
+        
+        // Deshabilitar botones
+        document.querySelectorAll('button').forEach(btn => {
+            btn.disabled = true;
+        });
+
+        // Calcular nueva vida
+        vidaActual = parseInt(localStorage.getItem("vida")) || 100;
+        const nuevaVida = Math.max(0, Math.min(100, vidaActual + valor));
+        
+        console.log(`❤️ ${playerName}: ${vidaActual} → ${nuevaVida}`);
+        
+        // Actualizar localStorage
+        localStorage.setItem("vida", nuevaVida);
+        vidaActual = nuevaVida;
+
+        // 📡 ENVIAR AL SERVIDOR
+        socket.emit("actualizarSalud", {
+            playerName: playerName,
+            delta: valor
+        });
+
+        // Mostrar mensaje local
+        const msg = document.getElementById("mensaje");
+        msg.textContent = mensaje + ` (Vida actual: ${vidaActual}%)`;
+        msg.style.color = valor > 0 ? "#00ffcc" : "#ff4d4d";
+        
+        document.getElementById('currentHealth').textContent = vidaActual;
+        showNotification(`${valor > 0 ? '+' : ''}${valor} salud`);
+        
+        // 🚀 REDIRIGIR después de 2 segundos
+        setTimeout(() => {
+            console.log("🔁 Volviendo al lobby...");
+            window.location.href = "../public/lobby.html";
+        }, 2000);
+    }
+
+    function showNotification(message) {
+        const notification = document.createElement('div');
+        notification.className = 'notification';
+        notification.textContent = message;
+        notification.style.background = message.includes('+') 
+            ? 'rgba(0, 255, 136, 0.9)' 
+            : 'rgba(255, 0, 0, 0.9)';
+        
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 1900);
+    }
+
+    // 📡 ESCUCHAR ACTUALIZACIONES
+    socket.on("actualizarSaludJugador", (data) => {
+        console.log("📢 Actualización de salud recibida:", data);
+    });
+
+    socket.on("registroExitoso", (data) => {
+        console.log("✅ Registrado en chance.html");
+        vidaActual = data.salud;
+        localStorage.setItem("vida", vidaActual);
+        document.getElementById('currentHealth').textContent = vidaActual;
+    });
+
+    socket.on("error", (mensaje) => {
+        console.error("❌ Error:", mensaje);
+        alert(`Error: ${mensaje}`);
+    });
+</script>
+</body>
+</html>

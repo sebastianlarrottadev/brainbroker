@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deceptive - Lobby</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: "Press Start 2P", cursive;
+  background: radial-gradient(circle at center, #0d1228 0%, #1a1f3c 50%, #0a0f24 100%);
+  color: #ffffff;
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Fondo animado */
+.bg-animation {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.floating-pixel {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: rgba(0, 255, 255, 0.4);
+  animation: float 8s infinite ease-in-out;
+  border-radius: 50%;
+}
+
+.floating-line {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00ffff, transparent);
+  animation: moveLine 6s infinite linear;
+  opacity: 0.6;
+}
+
+@keyframes float {
+  0% { transform: translateY(100vh); opacity: 0; }
+  10%, 90% { opacity: 1; }
+  100% { transform: translateY(-20px); opacity: 0; }
+}
+@keyframes moveLine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100vw); }
+}
+
+/* Pantalla Lobby */
+.lobby-screen {
+  position: relative;
+  z-index: 10;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* Jugadores */
+.player-container {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 2rem;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(10, 20, 40, 0.4);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+  backdrop-filter: blur(5px);
+}
+
+.player-container img {
+  width: 90px;
+  height: auto;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 0 15px #00ffff);
+  transition: transform 0.3s ease;
+}
+.player-container img:hover { transform: scale(1.1); }
+
+.player-name {
+  color: #00ffcc;
+  font-size: 0.7rem;
+  margin-bottom: 8px;
+  text-shadow: 0 0 6px #00ffff;
+}
+
+/* ❤️ Barra de salud (solo verde) */
+.health-bar {
+  width: 80%;
+  height: 18px;
+  background: rgba(0, 40, 70, 0.8);
+  border: 2px solid #00ff88;
+  border-radius: 10px;
+  margin: 0 auto;
+  overflow: hidden;
+  box-shadow: 0 0 8px #00ff88;
+}
+
+.health-fill {
+  height: 100%;
+  background: #00ff88;
+  transition: width 0.5s ease-in-out;
+}
+
+/* Botones inferiores */
+.bottom-buttons {
+  position: absolute;
+  bottom: 60px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 80px;
+  z-index: 10;
+}
+
+.btn-img {
+  width: 120px;
+  height: 120px;
+  cursor: pointer;
+  transition: transform 0.3s ease, filter 0.3s ease;
+  animation: floaty 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 25px #00ffff);
+  border-radius: 20px;
+  padding: 8px;
+  object-fit: contain;
+}
+
+.btn-img:hover {
+  transform: scale(1.25);
+  filter: drop-shadow(0 0 40px #00ffcc);
+}
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Botón volver */
+.back-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 55px;
+  height: 55px;
+  background: linear-gradient(135deg, #00ff88, #00ccff);
+  border: none;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #0d1228;
+  z-index: 20;
+  text-decoration: none;
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+  animation: glowButton 2s ease-in-out infinite alternate;
+}
+
+@keyframes glowButton {
+  from {
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.4),
+                0 0 20px rgba(0, 204, 255, 0.4);
+  }
+  to {
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.9),
+                0 0 40px rgba(0, 204, 255, 0.9);
+  }
+}
+.back-btn:hover { transform: scale(1.1); }
+
+/* Mensaje de bienvenida */
+.welcome-message {
+  position: absolute;
+  top: 25px;
+  right: 25px;
+  font-size: 0.7rem;
+  background: linear-gradient(45deg, #00ff88, #00ccff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+  letter-spacing: 1px;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from { text-shadow: 0 0 10px rgba(0, 255, 136, 0.3); }
+  to { text-shadow: 0 0 40px rgba(0, 204, 255, 0.8); }
+}
+
+/* 📱 Responsivo */
+@media (max-width: 600px) {
+  .player-container img { width: 70px; }
+  .bottom-buttons { gap: 40px; bottom: 50px; }
+  .btn-img { width: 100px; height: 100px; }
+}
+</style>
+</head>
+<body>
+  <div class="bg-animation" id="bgAnimation"></div>
+  <a href="index.html" class="back-btn">←</a>
+  <div class="welcome-message" id="welcomeMsg">WELCOME PLAYER</div>
+
+  <div class="lobby-screen">
+    <div id="playerList"></div>
+  </div>
+
+  <!-- BOTONES INFERIORES -->
+  <div class="bottom-buttons">
+    <a href="../AR/tarjeta.html"><img src="cofre (1).png" alt="Mystery" class="btn-img"></a>
+    <a href="../AR/chance.html"><img src="CHANCE (1).png" alt="Treasure" class="btn-img"></a>
+    <a href="../AR/ruleta.html"><img src="ruleta.png" alt="Ruleta" class="btn-img"></a>
+  </div>
+
+<script>
+    const bgAnimation = document.getElementById('bgAnimation');
+    const welcomeMsg = document.getElementById('welcomeMsg');
+    const playerList = document.getElementById('playerList');
+    const socket = io();
+
+    // Animación de fondo
+    function createFloatingPixel() {
+      const pixel = document.createElement('div');
+      pixel.className = 'floating-pixel';
+      pixel.style.left = Math.random() * 100 + '%';
+      pixel.style.animationDelay = Math.random() * 8 + 's';
+      pixel.style.animationDuration = (Math.random() * 4 + 6) + 's';
+      bgAnimation.appendChild(pixel);
+      setTimeout(() => pixel.remove(), 10000);
+    }
+    function createFloatingLine() {
+      const line = document.createElement('div');
+      line.className = 'floating-line';
+      line.style.top = Math.random() * 100 + '%';
+      line.style.width = (Math.random() * 200 + 100) + 'px';
+      line.style.animationDelay = Math.random() * 6 + 's';
+      bgAnimation.appendChild(line);
+      setTimeout(() => line.remove(), 8000);
+    }
+    for (let i = 0; i < 15; i++) setTimeout(createFloatingPixel, i * 500);
+    for (let i = 0; i < 5; i++) setTimeout(createFloatingLine, i * 1200);
+
+    // --- Datos del jugador ---
+    const playerName = localStorage.getItem("playerName") || "PLAYER";
+    const salaId = localStorage.getItem("salaId") || "default";
+    const personaje = localStorage.getItem("personaje") || "ps1.png";
+    let vida = parseInt(localStorage.getItem("vida")) || 100;
+
+    welcomeMsg.textContent = `WELCOME ${playerName.toUpperCase()}`;
+
+    // 🔄 REGISTRAR JUGADOR EN EL SERVIDOR (desde lobby)
+    socket.emit("registrarJugador", { 
+      salaId, 
+      playerName, 
+      personaje, 
+      desdeLobby: true 
+    });
+
+    // 📡 ESCUCHAR ACTUALIZACIONES DEL LOBBY
+    socket.on("actualizarLobby", (jugadores) => {
+      console.log("🔄 Actualizando lobby con:", jugadores);
+      playerList.innerHTML = jugadores.map(j => {
+        const saludReal = j.salud || 100;
+        const esMiJugador = j.name === playerName;
+        const estaConectado = j.estaConectado !== false; // true por defecto
+        
+        // Si es mi jugador, actualizar localStorage
+        if (esMiJugador) {
+          vida = saludReal;
+          localStorage.setItem("vida", vida);
+        }
+        
+        return `
+          <div class="player-container ${esMiJugador ? 'mi-jugador' : ''} ${!estaConectado ? 'desconectado' : ''}">
+            <img src="${j.personaje || 'ps1.png'}" alt="personaje">
+            <div class="player-name">
+              ${j.name} ${esMiJugador ? '(TÚ)' : ''}
+              ${!estaConectado ? ' 🔄' : ''}
+            </div>
+            <div class="health-bar">
+              <div class="health-fill" style="width:${saludReal}%;"></div>
+            </div>
+            <div class="health-percentage">${saludReal}%</div>
+            <div class="player-status">${!estaConectado ? 'Conectando...' : 'En línea'}</div>
+          </div>`;
+      }).join('');
+    });
+
+    // 💚 ESCUCHAR ACTUALIZACIONES DE SALUD
+    socket.on("actualizarSaludJugador", (data) => {
+      console.log(`❤️ Salud actualizada: ${data.playerName} → ${data.nuevaSalud}%`);
+      
+      // Actualizar mi salud local si soy yo
+      if (data.playerName === playerName) {
+        vida = data.nuevaSalud;
+        localStorage.setItem("vida", vida);
+      }
+      
+      // Mostrar notificación
+      showHealthNotification(data.playerName, data.delta);
+    });
+
+    // ✅ REGISTRO EXITOSO
+    socket.on("registroExitoso", (data) => {
+      console.log("✅ Registro exitoso en sala:", data.salaId);
+      vida = data.salud;
+      localStorage.setItem("vida", vida);
+    });
+
+    // 📢 MENSAJES DEL SISTEMA
+    socket.on("mensajeSistema", (mensaje) => {
+      console.log("📢 Mensaje del sistema:", mensaje);
+      showSystemNotification(mensaje);
+    });
+
+    // ❌ MANEJAR ERRORES
+    socket.on("error", (mensaje) => {
+      console.error("❌ Error:", mensaje);
+      alert(`Error: ${mensaje}`);
+      window.location.href = "index.html";
+    });
+
+    // 🎯 NAVEGACIÓN ENTRE PÁGINAS
+    function navegarAPagina(pagina) {
+      console.log(`🌐 Navegando a: ${pagina}`);
+      socket.emit("jugadorNavegando", {
+        playerName: playerName,
+        salaId: salaId,
+        pagina: pagina
+      });
+    }
+
+    // Modificar los enlaces para notificar navegación
+    document.querySelectorAll('.btn-img').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        const pagina = this.alt;
+        navegarAPagina(pagina);
+        // La redirección normal continúa después de notificar
+      });
+    });
+
+    // 🔄 SOLICITAR ESTADO ACTUAL PERIÓDICAMENTE
+    setInterval(() => {
+      socket.emit("obtenerEstadoLobby", { salaId });
+    }, 5000);
+
+    // 🎨 FUNCIONES DE NOTIFICACIÓN
+    function showHealthNotification(jugadorNombre, delta) {
+      if (jugadorNombre === playerName) return; // No mostrar notificación para uno mismo
+      
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: ${delta > 0 ? 'rgba(0, 255, 136, 0.9)' : 'rgba(255, 0, 0, 0.9)'};
+        color: white;
+        padding: 15px 30px;
+        border-radius: 15px;
+        font-size: 1rem;
+        z-index: 1000;
+        animation: fadeInOut 2s ease-in-out;
+      `;
+      notification.textContent = `${jugadorNombre}: ${delta > 0 ? '+' : ''}${delta} salud`;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => notification.remove(), 2000);
+    }
+
+    function showSystemNotification(mensaje) {
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 200, 255, 0.9);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 0.8rem;
+        z-index: 1000;
+        animation: fadeInOut 3s ease-in-out;
+      `;
+      notification.textContent = mensaje;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => notification.remove(), 3000);
+    }
+
+    // 🎨 AGREGAR ESTILOS CSS ADICIONALES
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeInOut {
+        0% { opacity: 0; transform: translate(-50%, -20px); }
+        20% { opacity: 1; transform: translate(-50%, 0); }
+        80% { opacity: 1; transform: translate(-50%, 0); }
+        100% { opacity: 0; transform: translate(-50%, -20px); }
+      }
+      .health-percentage {
+        font-size: 0.6rem;
+        color: #00ff88;
+        margin-top: 5px;
+        text-shadow: 0 0 5px #00ff88;
+      }
+      .player-status {
+        font-size: 0.5rem;
+        color: #88aaff;
+        margin-top: 3px;
+      }
+      .mi-jugador {
+        border: 2px solid #00ff88;
+        box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+      }
+      .desconectado {
+        opacity: 0.6;
+        border: 2px solid #ffaa00;
+      }
+      .desconectado .player-name {
+        color: #ffaa00;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // 📱 CARGAR ESTADO INICIAL
+    socket.emit("obtenerEstadoLobby", { salaId });
+</script>
+</body>
+</html>

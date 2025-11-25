@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ruleta AR 1–6 — Futurista (Hiro, UV FIX)</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <!-- AR.js (A-Frame build) -->
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    :root{
+      --neon:#00E5FF;
+      --neon2:#7C4DFF;
+      --safe-top: env(safe-area-inset-top);
+      --safe-right: env(safe-area-inset-right);
+      --safe-bottom: env(safe-area-inset-bottom);
+      --safe-left: env(safe-area-inset-left);
+    }
+    html, body { height: 100%; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial; background:#000; color:#fff; }
+
+    .hint{
+      position:fixed; left:50%; top:calc(12px + var(--safe-top));
+      transform:translateX(-50%);
+      background:rgba(0,0,0,.65); color:#fff; padding:8px 12px; border-radius:10px; z-index:30; font-size:14px;
+      border:1px solid rgba(0,229,255,.25);
+      box-shadow: 0 6px 18px rgba(0,229,255,.15);
+    }
+
+    #resultHUD{
+      position: fixed; top:calc(12px + var(--safe-top)); right:calc(12px + var(--safe-right)); z-index: 30;
+      background: rgba(33,33,33,.85); color:#fff;
+      padding: 10px 14px; border-radius: 10px; font-size: 18px; display:none;
+      box-shadow: 0 6px 24px rgba(0,0,0,.25);
+    }
+
+    #mute{
+      position:fixed; bottom:calc(12px + var(--safe-bottom)); left:50%; transform:translateX(-50%);
+      border:0; padding:10px 14px; border-radius:10px;
+      background:linear-gradient(135deg, var(--neon), var(--neon2));
+      color:#fff; font-size:14px; cursor:pointer; z-index:10000;
+      box-shadow: 0 8px 24px rgba(0,229,255,.35);
+    }
+
+    /* Overlay full screen responsive */
+    #fullResult {
+      position: fixed !important;
+      top: 0; left: 0;
+      width: 100vw; height: 100dvh;
+      z-index: 9999; display: none;
+      display: flex; align-items: center; justify-content: center;
+      padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right))
+               calc(12px + var(--safe-bottom)) calc(12px + var(--safe-left));
+      background:
+        radial-gradient(1200px 700px at 50% -10%, rgba(0,229,255,.18), transparent 60%),
+        radial-gradient(900px 600px at 50% 120%, rgba(124,77,255,.16), transparent 60%),
+        linear-gradient(180deg, rgba(0,0,0,.92), rgba(0,0,0,.88));
+      color:#fff; text-align: center; overflow: hidden;
+    }
+    #fullResult::before{
+      content:"";
+      position:absolute; inset:0; pointer-events:none; opacity:.25;
+      background:
+        linear-gradient(transparent 49%, rgba(0,229,255,.15) 50%, transparent 51%) 0 0/100% 24px,
+        linear-gradient(90deg, transparent 49%, rgba(124,77,255,.12) 50%, transparent 51%) 0 0/24px 100%;
+      animation: gridShift 8s linear infinite;
+      filter: blur(.2px);
+    }
+    @keyframes gridShift{
+      0%{ background-position: 0 0, 0 0; }
+      100%{ background-position: 0 -24px, -24px 0; }
+    }
+    #fullResult::after{
+      content:"";
+      position:absolute; inset:0; pointer-events:none;
+      background: repeating-linear-gradient(180deg, rgba(255,255,255,.05) 0 2px, transparent 2px 4px);
+      mix-blend-mode: overlay; opacity:.08;
+    }
+    #fullResult .content {
+      position: relative;
+      padding: 16px 24px;
+      border-radius: 16px;
+      box-shadow: 0 0 50px rgba(0,229,255,.25), inset 0 0 24px rgba(124,77,255,.25);
+      border: 1px solid rgba(255,255,255,.08);
+      backdrop-filter: blur(4px) saturate(120%);
+      max-width: min(88vw, 800px);
+    }
+    .halo{
+      position:absolute; inset: -12vmax; z-index:-1;
+      background: radial-gradient(circle at 50% 50%, rgba(0,229,255,.25), rgba(124,77,255,.2) 40%, transparent 60%);
+      filter: blur(60px);
+      animation: breathe 3.5s ease-in-out infinite;
+    }
+    @keyframes breathe{
+      0%,100%{ transform: scale(1); opacity:.85; }
+      50%{ transform: scale(1.08); opacity:1; }
+    }
+
+    .number {
+      font-size: clamp(86px, 18vw, 200px);
+      line-height: 1; font-weight: 900; letter-spacing: 2px;
+      text-shadow:
+        0 0 8px rgba(0,229,255,.7),
+        0 0 24px rgba(124,77,255,.6),
+        0 0 48px rgba(124,77,255,.5);
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,.5));
+      margin-bottom: 8px;
+      background: linear-gradient(180deg, #fff, #C6E8FF 60%, #99A7FF);
+      -webkit-background-clip: text; background-clip:text; color: transparent;
+    }
+    .msg {
+      font-size: clamp(22px, 4.5vw, 42px);
+      color: #E6FBFF;
+      text-shadow: 0 0 10px rgba(0,229,255,.6);
+      letter-spacing: .5px;
+    }
+    .tap {
+      margin-top: 18px; font-size: 14px; opacity: .8;
+      color:#C7BFFF;
+    }
+    #fx {
+      position:absolute; inset:0; pointer-events:none; z-index:0;
+      width: 100%; height: 100%; display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">Toca la ruleta para girar</div>
+  <div id="resultHUD"></div>
+  <button id="mute">🔊 Sonido</button>
+
+  <!-- Overlay full screen -->
+  <div id="fullResult" role="dialog" aria-live="polite">
+    <canvas id="fx"></canvas>
+    <div class="content">
+      <div class="halo"></div>
+      <div class="number" id="bigNumber">5</div>
+      <div class="msg" id="bigMsg">Mueve 5 casillas en el mapa</div>
+      <div class="tap">(toca para continuar)</div>
+    </div>
+  </div>
+
+  <a-scene
+    id="scene"
+    embedded
+    vr-mode-ui="enabled:false"
+    renderer="antialias:true;colorManagement:true"
+    arjs="sourceType: webcam; detectionMode: mono; debugUIEnabled: false"
+  >
+    <a-assets timeout="10000">
+      <canvas id="rouletteCanvas" width="1024" height="1024"></canvas>
+    </a-assets>
+
+    <a-entity light="type: ambient; intensity: 0.9"></a-entity>
+    <a-entity light="type: directional; intensity: 1.2" position="1 1 0"></a-entity>
+
+    <a-entity camera>
+      <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable; interval: 50"></a-entity>
+    </a-entity>
+
+    <!-- Marcador Hiro -->
+    <a-marker preset="hiro" id="mk">
+      <a-entity id="rouletteGroup" position="0 0.6 0">
+        <!-- Spinner que rota en Z -->
+        <a-entity id="rouletteSpinner">
+          <!-- DISCO con UV PLANA (fix) -->
+          <a-circle id="rouletteDisk" class="clickable"
+                    radius="0.98" rotation="0 0 -90"
+                    material="shader: flat; src: #rouletteCanvas; side: double; transparent: true">
+          </a-circle>
+
+          <!-- Área de click un poco más grande (también círculo) -->
+          <a-circle class="clickable"
+                    radius="1.15" rotation="-90 0 0" position="0 0 0.01"
+                    material="opacity:0; transparent:true">
+          </a-circle>
+
+          <!-- aro / hub decorativos (opcional) -->
+          <a-torus radius="1.05" radius-tubular="0.04"
+                   material="color:#C8A853; metalness:0.9; roughness:0.2"></a-torus>
+          
+        </a-entity>
+
+        <!-- Aguja fija -->
+        <a-entity>
+          <a-cone height="0.16" radius-bottom="0.06" radius-top="0.0"
+                  position="0 1.06 0.055" rotation="-90 0 0"
+                  material="color:#FF5252;"></a-cone>
+          <a-cylinder radius="0.025" height="0.08"
+                      position="0 0.98 0.04" rotation="-90 0 0"
+                      material="color:#263238;"></a-cylinder>
+        </a-entity>
+      </a-entity>
+    </a-marker>
+  </a-scene>
+
+  <script>
+    /* ===== Config & Audio ===== */
+    let EXTRA_OFFSET = 180; // corrige inversión según tu orientación
+    let muted = false;
+
+    function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+
+    // Sonido "tic"
+    let audioCtx;
+    function playTick(){
+      if (muted) return;
+      try{
+        audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'square';
+        o.frequency.value = 1200 + Math.random()*200;
+        g.gain.value = 0.0001;
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start();
+        g.gain.exponentialRampToValueAtTime(0.08, audioCtx.currentTime+0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+0.07);
+        o.stop(audioCtx.currentTime+0.08);
+      }catch(e){}
+    }
+
+    /* ===== Ruleta FUTURISTA (canvas) ===== */
+    function drawRoulette6(){
+      const cvs = document.getElementById('rouletteCanvas');
+      const ctx = cvs.getContext('2d');
+      const W = 1024, H = 1024;
+      const cx = W/2, cy = H/2;
+      const R  = 480;        // radio exterior
+      const Rin = 140;       // radio interior (para hub)
+
+      ctx.clearRect(0,0,W,H);
+
+      // Fondo/halo
+      const bg = ctx.createRadialGradient(cx, cy, Rin*0.4, cx, cy, R*1.05);
+      bg.addColorStop(0, 'rgba(0,229,255,0.10)');
+      bg.addColorStop(0.6,'rgba(124,77,255,0.08)');
+      bg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0,0,W,H);
+
+      // Aro exterior “neón”
+      const outerPasses = [{w:18,a:0.20},{w:10,a:0.45},{w:4,a:0.9}];
+      outerPasses.forEach(p=>{
+        ctx.beginPath();
+        const g = ctx.createLinearGradient(cx-R, cy, cx+R, cy);
+        g.addColorStop(0,'rgba(0,229,255,'+p.a+')');
+        g.addColorStop(1,'rgba(124,77,255,'+p.a+')');
+        ctx.strokeStyle = g;
+        ctx.lineWidth = p.w;
+        ctx.arc(cx,cy,R-6,0,Math.PI*2);
+        ctx.stroke();
+      });
+
+      // 6 sectores (60°)
+      for(let i=0;i<6;i++){
+        const a0 = (i*60) * Math.PI/180;
+        const a1 = ((i+1)*60) * Math.PI/180;
+
+        const sg = ctx.createRadialGradient(cx, cy, Rin*0.9, cx, cy, R);
+        const cA = i%2===0 ? 'rgba(0,229,255,0.85)' : 'rgba(124,77,255,0.85)';
+        const cB = i%2===0 ? 'rgba(124,77,255,0.25)' : 'rgba(0,229,255,0.25)';
+        sg.addColorStop(0, cA);
+        sg.addColorStop(1, cB);
+
+        ctx.beginPath();
+        ctx.moveTo(cx + Rin*Math.cos(a0), cy + Rin*Math.sin(a0));
+        ctx.arc(cx, cy, R, a0, a1);
+        ctx.arc(cx, cy, Rin, a1, a0, true);
+        ctx.closePath();
+        ctx.fillStyle = sg;
+        ctx.fill();
+
+        // separador luminoso
+        ctx.save();
+        ctx.lineWidth = 4;
+        const sepGrad = ctx.createLinearGradient(
+          cx + (R-2)*Math.cos(a0), cy + (R-2)*Math.sin(a0),
+          cx + Rin*Math.cos(a0),   cy + Rin*Math.sin(a0)
+        );
+        sepGrad.addColorStop(0,'rgba(255,255,255,0.75)');
+        sepGrad.addColorStop(1,'rgba(255,255,255,0.0)');
+        ctx.strokeStyle = sepGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx + (R-2)*Math.cos(a0), cy + (R-2)*Math.sin(a0));
+        ctx.lineTo(cx + Rin*Math.cos(a0),   cy + Rin*Math.sin(a0));
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // “Circuitos” radiales
+      for(let d=0; d<360; d+=10){
+        const a = d * Math.PI/180;
+        const r0 = R*0.82, r1 = R*0.97;
+        ctx.beginPath();
+        ctx.strokeStyle = d%30===0 ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.14)';
+        ctx.lineWidth   = d%30===0 ? 3 : 2;
+        ctx.moveTo(cx + r0*Math.cos(a), cy + r0*Math.sin(a));
+        ctx.lineTo(cx + r1*Math.cos(a), cy + r1*Math.sin(a));
+        ctx.stroke();
+      }
+
+      // Hexágono central
+      function polygon(ctx, x, y, r, sides, rotRad){
+        ctx.beginPath();
+        for(let k=0;k<sides;k++){
+          const ang = rotRad + k*(Math.PI*2/sides);
+          const px = x + r*Math.cos(ang);
+          const py = y + r*Math.sin(ang);
+          if(k===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+        }
+        ctx.closePath();
+      }
+      const hexR = Rin*0.85;
+      for(let pass=0; pass<3; pass++){
+        ctx.save();
+        ctx.lineWidth   = [10,6,2][pass];
+        ctx.strokeStyle = ['rgba(0,229,255,0.25)','rgba(124,77,255,0.35)','rgba(255,255,255,0.8)'][pass];
+        polygon(ctx,cx,cy, hexR + (pass?0:6), 6, Math.PI/2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Números 1..6
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for(let i=0;i<6;i++){
+        const ang = (i*60 + 30) * Math.PI/180;
+        const rx  = (R*0.62);
+        const x = cx + rx*Math.cos(ang);
+        const y = cy + rx*Math.sin(ang);
+
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.font = 'bold 116px system-ui, sans-serif';
+        ctx.fillText(String(i+1), x+3, y+3);
+
+        const lg = ctx.createLinearGradient(x-60,y-60, x+60,y+60);
+        lg.addColorStop(0,'#E6FBFF');
+        lg.addColorStop(0.5, i%2===0 ? '#00E5FF' : '#7C4DFF');
+        lg.addColorStop(1,'#C6B7FF');
+        ctx.fillStyle = lg;
+        ctx.fillText(String(i+1), x, y);
+      }
+
+      // Aro interior
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+      ctx.arc(cx, cy, Rin, 0, Math.PI*2);
+      ctx.stroke();
+
+      // Refrescar material y clamp
+      const disk = document.getElementById('rouletteDisk');
+      const mat  = disk && disk.components && disk.components.material && disk.components.material.material;
+      if (mat && mat.map) {
+        if (window.THREE) {
+          mat.map.wrapS = THREE.ClampToEdgeWrapping;
+          mat.map.wrapT = THREE.ClampToEdgeWrapping;
+        }
+        mat.map.needsUpdate = true;
+      }
+    }
+
+    // Forzar clamp unos ms después para asegurar material listo
+    function clampRouletteTexture(){
+      const disk = document.getElementById('rouletteDisk');
+      const mat  = disk?.components?.material?.material;
+      const tex  = mat?.map;
+      if (tex && window.THREE){
+        tex.wrapS = THREE.ClampToEdgeWrapping;
+        tex.wrapT = THREE.ClampToEdgeWrapping;
+        tex.needsUpdate = true;
+      }
+    }
+  </script>
+
+  <script>
+    /* ===== Giro con suspenso ===== */
+    let spinning=false; let rafId=null; let lastTickDeg=0;
+
+    function getCurrentDeg(spinner){
+      let deg=spinner.object3D.rotation.z*180/Math.PI;
+      return (deg%360+360)%360;
+    }
+    function setSpinnerDeg(spinner,deg){ spinner.object3D.rotation.z=deg*Math.PI/180; }
+
+    function spinWithSuspense(){
+      if(spinning) return; spinning=true;
+      const spinner=document.getElementById('rouletteSpinner');
+      const hud=document.getElementById('resultHUD');
+      hud.style.display='none';
+
+      const result=1+Math.floor(Math.random()*6);
+      const thetaEnd=(result-1)*60+30; // centro de sector
+      const cur=getCurrentDeg(spinner);
+      let targetBase=(thetaEnd-EXTRA_OFFSET+360)%360;
+      const extraTurns=3+Math.random()*3; // 3–6 vueltas
+      const target=targetBase+360*Math.ceil(extraTurns);
+
+      // Duración 4–6 s
+      const dur=4000+Math.random()*2000;
+
+      const t0=performance.now();
+      lastTickDeg=cur;
+
+      cancelAnimationFrame(rafId);
+      const step=(now)=>{
+        let t=(now-t0)/dur; if(t>1)t=1;
+        const eased=easeInOutCubic(t);
+        const deg=cur+(target-cur)*eased;
+        setSpinnerDeg(spinner,deg);
+
+        // Tick cada 15°
+        const norm=(deg%360+360)%360;
+        const prev=(lastTickDeg%360+360)%360;
+        if(Math.floor(norm/15)!==Math.floor(prev/15)) playTick();
+        lastTickDeg=deg;
+
+        if(t<1){ rafId=requestAnimationFrame(step); }
+        else{
+          hud.textContent='Te tocó: '+result; hud.style.display='block';
+          showFullResult(result);
+          spinning=false;
+        }
+      };
+      rafId=requestAnimationFrame(step);
+    }
+  </script>
+
+  <!-- ===== FX: estrellas + estelas + fuegos ===== -->
+  <script>
+    let fxCtx, fxW=0, fxH=0, fxReq;
+    let stars=[], particles=[];
+    let runningFX=false;
+
+    function resizeFX(){
+      const c = document.getElementById('fx');
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const rect = c.getBoundingClientRect();
+      fxW = c.width  = Math.max(1, Math.floor(rect.width  * dpr));
+      fxH = c.height = Math.max(1, Math.floor(rect.height * dpr));
+      fxCtx = c.getContext('2d');
+      fxCtx.setTransform(1,0,0,1,0,0);
+      fxCtx.scale(dpr, dpr);
+    }
+
+    function initStars(count=120){
+      stars = [];
+      const c = document.getElementById('fx');
+      const rect = c.getBoundingClientRect();
+      for (let i=0;i<count;i++){
+        stars.push({
+          x: Math.random()*rect.width,
+          y: Math.random()*rect.height,
+          r: Math.random()*1.2 + 0.4,
+          tw: Math.random()*Math.PI*2,
+          sp: 0.5 + Math.random()*0.8
+        });
+      }
+    }
+
+    function fireworkBurst(x, y, hueBase=200, amount=90, speed=6){
+      for (let i=0;i<amount;i++){
+        const ang = Math.random()*Math.PI*2;
+        const spd = (0.5 + Math.random())*speed;
+        particles.push({
+          x, y,
+          vx: Math.cos(ang)*spd,
+          vy: Math.sin(ang)*spd,
+          life: 900 + Math.random()*600,
+          born: performance.now(),
+          r: 1 + Math.random()*3,
+          hue: hueBase + (Math.random()<.5 ? -40 : 40),
+          trail: [],
+          maxTrail: 8
+        });
+      }
+    }
+
+    function fireworksSequence(){
+      const c = document.getElementById('fx');
+      const rect = c.getBoundingClientRect();
+      const cx = rect.width/2, cy = rect.height/2;
+
+      fireworkBurst(cx, cy, 195, 100, 7);
+
+      const R = Math.min(rect.width, rect.height) * 0.22;
+      for (let k=0;k<3;k++){
+        const a = (k/3)*Math.PI*2 + Math.random()*0.3;
+        const x = cx + R*Math.cos(a);
+        const y = cy + R*Math.sin(a);
+        const hue = [195, 266, 210][k%3];
+        setTimeout(()=>fireworkBurst(x,y,hue,70,6), 180 + k*140);
+      }
+    }
+
+    function runFX(){
+      if (!runningFX) return;
+      const ctx = fxCtx;
+      const c = document.getElementById('fx');
+      const rect = c.getBoundingClientRect();
+
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(0,0,rect.width,rect.height);
+
+      // Estrellas
+      for (const s of stars){
+        s.tw += 0.02*s.sp;
+        const alpha = 0.4 + 0.6*(0.5+0.5*Math.sin(s.tw));
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      const now = performance.now();
+
+      // Partículas con estela
+      const GRAV = 0.00075;
+      const FRICTION = 0.995;
+      particles = particles.filter(p=>{
+        const t = now - p.born;
+        if (t > p.life) return false;
+
+        p.trail.push({x:p.x, y:p.y, t});
+        if (p.trail.length > p.maxTrail) p.trail.shift();
+
+        p.vx *= FRICTION;
+        p.vy = p.vy*FRICTION + GRAV* (t/16);
+        p.x += p.vx;
+        p.y += p.vy;
+
+        for (let i=1; i<p.trail.length; i++){
+          const a = i/p.trail.length;
+          fxCtx.strokeStyle = `hsla(${p.hue}, 100%, 65%, ${0.16*a})`;
+          fxCtx.lineWidth = Math.max(1, p.r * a);
+          fxCtx.beginPath();
+          fxCtx.moveTo(p.trail[i-1].x, p.trail[i-1].y);
+          fxCtx.lineTo(p.trail[i].x,   p.trail[i].y);
+          fxCtx.stroke();
+        }
+
+        const lifeK = 1 - t/p.life;
+        const glow = 0.35 + 0.65*lifeK;
+        fxCtx.beginPath();
+        fxCtx.fillStyle = `hsla(${p.hue}, 100%, 60%, ${glow})`;
+        fxCtx.arc(p.x, p.y, p.r*(0.5+1.2*lifeK), 0, Math.PI*2);
+        fxCtx.fill();
+
+        return true;
+      });
+
+      fxReq = requestAnimationFrame(runFX);
+    }
+
+    function startFX(){
+      requestAnimationFrame(()=>{
+        resizeFX();
+        initStars();
+        particles = [];
+        runningFX = true;
+        fireworksSequence();
+        runFX();
+      });
+    }
+
+    function stopFX(){
+      runningFX = false;
+      cancelAnimationFrame(fxReq);
+    }
+  </script>
+
+  <script>
+    /* ===== Overlay & Bootstrap ===== */
+    function showFullResult(n){
+      const overlay = document.getElementById('fullResult');
+      const bigN    = document.getElementById('bigNumber');
+      const bigMsg  = document.getElementById('bigMsg');
+      bigN.textContent = n;
+      bigMsg.textContent = 'Mueve ' + n + ' casillas en el mapa';
+      overlay.style.display = 'flex';
+      overlay.animate([{opacity:0},{opacity:1}],{duration:220, easing:'ease-out'});
+      startFX();
+    }
+
+    window.addEventListener('DOMContentLoaded',()=>{
+      const scene=document.getElementById('scene');
+      const spinner=document.getElementById('rouletteSpinner');
+      const mk=document.getElementById('mk');
+
+      scene.addEventListener('loaded',()=>{
+        drawRoulette6();
+        setTimeout(drawRoulette6,100);
+        setTimeout(clampRouletteTexture,150); // asegura clamp tras crear material
+      });
+
+      spinner.addEventListener('click',spinWithSuspense);
+      spinner.addEventListener('touchstart',spinWithSuspense,{passive:true});
+
+      const muteBtn=document.getElementById('mute');
+      muteBtn.addEventListener('click',()=>{ muted=!muted; muteBtn.textContent=muted?'🔇 Sonido':'🔊 Sonido'; });
+
+      document.getElementById('fullResult').addEventListener('click', (e)=>{
+        e.currentTarget.style.display='none';
+        stopFX();
+      }, {passive:true});
+
+      window.addEventListener('orientationchange', ()=>{
+        if (document.getElementById('fullResult').style.display !== 'none') {
+          requestAnimationFrame(()=>{ resizeFX(); });
+        }
+      });
+
+      mk.addEventListener('markerFound', ()=>console.log('[AR] Hiro DETECTADO'));
+      mk.addEventListener('markerLost',  ()=>console.log('[AR] Hiro PERDIDO'));
+    });
+  </script>
+</body>
+</html>
