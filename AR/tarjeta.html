@@ -1,0 +1,30 @@
+      <!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tarjeta GLB AR — Giro lento</title>
+  <link rel="icon" type="image/png" href="/public/ps2.png">
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
+  <style> body { margin:0; font-family: system-ui, sans-serif; } </style>
+</head>
+<body>
+  <a-scene embedded vr-mode-ui="enabled:false" arjs="sourceType: webcam; detectionMode: mono; debugUIEnabled: false">
+    <a-entity light="type: ambient; intensity: 0.85"></a-entity>
+    <a-entity light="type: directional; intensity: 1.2" position="1 1 0"></a-entity>
+
+    <a-entity camera></a-entity>
+
+    <a-marker preset="hiro">
+      <!-- Reemplaza la ruta del GLB si hace falta -->
+      <a-entity gltf-model="url(./ACCION_PRUEBA_ESCANEABLE.glb)"
+                position="0 0 0"
+                scale="0.5 0.5 0.5"
+                animation-mixer
+                animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
+      </a-entity>
+    </a-marker>
+  </a-scene>
+</body>
+</html>
