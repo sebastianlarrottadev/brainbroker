@@ -5,14 +5,45 @@ const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
 
-const PORT = 3000;
+// Configuración optimizada para Render
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000
+});
+
+// Render asigna el puerto automáticamente
+const PORT = process.env.PORT || 3000;
 const MAX_JUGADORES_POR_SALA = 4;
 
 // Servir archivos estáticos
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/AR", express.static(path.join(__dirname, "AR")));
+
+// Ruta principal
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// Ruta para el lobby
+app.get("/lobby", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "lobby.html"));
+});
+
+// Ruta de salud para Render (IMPORTANTE)
+app.get("/health", (req, res) => {
+  res.status(200).json({ 
+    status: "OK", 
+    service: "Deceptive Game",
+    timestamp: new Date().toISOString(),
+    salas_activas: Object.keys(salas).length,
+    jugadores_conectados: jugadoresConectados.size
+  });
+});
 
 // Estructura mejorada
 const salas = {};
@@ -160,8 +191,10 @@ io.on("connection", (socket) => {
   });
 });
 
-// 🚀 Iniciar servidor
-server.listen(PORT, () => {
-  console.log(`Servidor corriendo en 👉 http://localhost:${PORT}`);
-  console.log(`Máximo de jugadores por sala: ${MAX_JUGADORES_POR_SALA}`);
+// 🚀 Iniciar servidor optimizado para Render
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🎮 Servidor Deceptive corriendo en puerto: ${PORT}`);
+  console.log(`📍 Entorno: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`👥 Máximo de jugadores por sala: ${MAX_JUGADORES_POR_SALA}`);
+  console.log(`🌐 URL: https://tu-app.onrender.com`);
 });
