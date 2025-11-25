@@ -210,11 +210,6 @@
 
   <div id="mensaje" class="feedback"></div>
 
-  <div class="action-buttons">
-    <a href="../public/lobby.html" class="btn">Volver al Lobby</a>
-    <a href="../public/index.html" class="btn btn-secondary">Menú Principal</a>
-  </div>
-
 <script>
     const socket = io();
     
@@ -268,11 +263,6 @@
         document.getElementById('currentHealth').textContent = vidaActual;
         showNotification(`${valor > 0 ? '+' : ''}${valor} salud`);
         
-        // 🚀 REDIRIGIR después de 2 segundos
-        setTimeout(() => {
-            console.log("🔁 Volviendo al lobby...");
-            window.location.href = "../public/lobby.html";
-        }, 2000);
     }
 
     function showNotification(message) {
@@ -305,4 +295,5 @@
     });
 </script>
 </body>
+
 </html>
